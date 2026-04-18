@@ -17,6 +17,25 @@ const locationSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    // H7: etiqueta de lugar manual — máx 30 chars, sanitizada, auto-invalidada por tiempo/distancia
+    label: {
+      type: String,
+      default: null,
+    },
+    // H7 CA.4: coordenadas donde se creó la etiqueta, para detectar si el usuario se alejó >500m
+    labelLatitude: {
+      type: Number,
+      default: null,
+    },
+    labelLongitude: {
+      type: Number,
+      default: null,
+    },
+    // H7 CA.4: momento en que se creó la etiqueta, para invalidar tras 6 horas
+    labelCreatedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: { createdAt: true, updatedAt: false },
