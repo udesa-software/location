@@ -211,6 +211,24 @@ describe('locationService.getFriendsLocations', () => {
 
     expect(result.friends[0].label).toBeNull();
   });
+
+  // H7 CA.4: etiqueta vigente (menos de 6h) sí se muestra en la respuesta
+  it('muestra la etiqueta si todavía está dentro de las 6 horas válidas (CA.4)', async () => {
+    locationRepository.findLastByUsers.mockResolvedValue([
+      {
+        _id: FRIEND_ID,
+        latitude: -34.61,
+        longitude: -58.39,
+        label: 'En la facu',
+        labelCreatedAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 horas atrás (válida)
+        updatedAt: new Date(),
+      },
+    ]);
+
+    const result = await locationService.getFriendsLocations(USER_ID, VALID_COORDS);
+
+    expect(result.friends[0].label).toBe('En la facu');
+  });
 });
 
 describe('locationService.updateLabel', () => {

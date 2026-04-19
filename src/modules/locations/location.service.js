@@ -87,15 +87,14 @@ const locationService = {
 
     const locations = await locationRepository.findLastByUsers(friendIds);
 
-    // H7 CA.4: filtrar etiquetas expiradas en la respuesta
+    // H7 CA.4: la distancia ya se invalida en updateLocation (cuando el amigo mueve el celular).
+    // Acá solo chequeamos tiempo: si pasaron más de 6h sin que actualice, ocultamos la etiqueta.
+    const sixHoursMs = 6 * 60 * 60 * 1000;
+
     const friends = locations.map((loc) => {
       const distanceMeters = haversineMeters(latitude, longitude, loc.latitude, loc.longitude);
-
-      const labelValid = loc.label && isLabelStillValid(
-        { label: loc.label, labelCreatedAt: loc.labelCreatedAt, labelLatitude: loc.latitude, labelLongitude: loc.longitude },
-        loc.latitude, loc.longitude
-      );
-
+      const labelValid = loc.label && loc.labelCreatedAt &&
+        (Date.now() - new Date(loc.labelCreatedAt).getTime() <= sixHoursMs);
       return {
         userId: loc._id,
         latitude: loc.latitude,
