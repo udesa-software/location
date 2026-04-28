@@ -1,5 +1,6 @@
 const { locationRepository } = require('./location.repository');
 const { friendsClient } = require('../../clients/friendsClient');
+const { usersClient } = require('../../clients/usersClient');
 const { AppError } = require('../../middlewares/errorHandler');
 const { env } = require('../../config/env');
 
@@ -107,6 +108,61 @@ const locationService = {
     });
 
     return { friends };
+  },
+
+  // H5 CA.1/CA.2/CA.3: activa o desactiva el modo privado del usuario.
+  async setPrivacyStatus(userId, isPrivate) {
+    await locationRepository.upsertPrivacy(userId, isPrivate);
+    return {
+      message: isPrivate ? 'Modo privado activado' : 'Modo privado desactivado',
+      isPrivate,
+    };
+  },
+
+  // H5: devuelve el estado actual del modo privado. Si no existe registro, es público (false).
+  async getPrivacyStatus(userId) {
+    const record = await locationRepository.findPrivacyByUser(userId);
+    return { isPrivate: record?.isPrivate ?? false };
+  },
+
+  // H6: devuelve usuarios cercanos que no son amigos del userId y tienen modo privado desactivado.
+  // CA.2: radiusKm viene de las preferencias del usuario (enviado por el cliente).
+  async getRadar(userId, { latitude, longitude, radiusKm }) {
+    const friendIds = await friendsClient.getFriendIds(userId);
+    const excludeUserIds = [userId, ...friendIds];
+
+    const nearby = await locationRepository.findNearbyUsers(latitude, longitude, radiusKm, excludeUserIds);
+
+    // Filtro exacto por Haversine sobre los resultados del bounding box
+    const withinRadius = nearby.filter((loc) => {
+      const dist = haversineMeters(latitude, longitude, loc.latitude, loc.longitude);
+      return dist <= radiusKm * 1000;
+    });
+
+    if (withinRadius.length === 0) {
+      return { users: [] };
+    }
+
+    const userIds = withinRadius.map((loc) => loc._id);
+    const profiles = await usersClient.getUserProfiles(userIds);
+
+    // Indexar perfiles por id para join eficiente
+    const profileMap = new Map(profiles.map((p) => [p.id, p.username]));
+
+    const users = withinRadius
+      .filter((loc) => profileMap.has(loc._id))
+      .map((loc) => {
+        const distanceMeters = Math.round(haversineMeters(latitude, longitude, loc.latitude, loc.longitude));
+        return {
+          userId: loc._id,
+          username: profileMap.get(loc._id),
+          distanceMeters,
+          distance: formatDistance(distanceMeters),
+        };
+      })
+      .sort((a, b) => a.distanceMeters - b.distanceMeters);
+
+    return { users };
   },
 
   // H7: guardar o actualizar la etiqueta de lugar manual del usuario.

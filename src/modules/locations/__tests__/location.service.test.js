@@ -1,11 +1,15 @@
 const { locationService } = require('../location.service');
 const { locationRepository } = require('../location.repository');
 const { friendsClient } = require('../../../clients/friendsClient');
+const { usersClient } = require('../../../clients/usersClient');
 
 jest.mock('../location.repository', () => ({
   locationRepository: {
     findLastByUser: jest.fn(),
     findLastByUsers: jest.fn(),
+    findNearbyUsers: jest.fn(),
+    findPrivacyByUser: jest.fn(),
+    upsertPrivacy: jest.fn(),
     save: jest.fn(),
     updateLabel: jest.fn(),
   },
@@ -17,8 +21,18 @@ jest.mock('../../../clients/friendsClient', () => ({
   },
 }));
 
+jest.mock('../../../clients/usersClient', () => ({
+  usersClient: {
+    getUserProfiles: jest.fn(),
+  },
+}));
+
 jest.mock('../../../config/env', () => ({
-  env: { MIN_UPDATE_INTERVAL_SECONDS: '60', FRIENDS_SERVICE_URL: 'http://friends:3001' },
+  env: {
+    MIN_UPDATE_INTERVAL_SECONDS: '60',
+    FRIENDS_SERVICE_URL: 'http://friends:3001',
+    USERS_SERVICE_URL: 'http://users:3000',
+  },
 }));
 
 const USER_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -228,6 +242,216 @@ describe('locationService.getFriendsLocations', () => {
     const result = await locationService.getFriendsLocations(USER_ID, VALID_COORDS);
 
     expect(result.friends[0].label).toBe('En la facu');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// H5: setPrivacyStatus
+// ---------------------------------------------------------------------------
+describe('locationService.setPrivacyStatus', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    locationRepository.upsertPrivacy.mockResolvedValue({});
+  });
+
+  it('llama a upsertPrivacy con el userId y isPrivate=true', async () => {
+    await locationService.setPrivacyStatus(USER_ID, true);
+    expect(locationRepository.upsertPrivacy).toHaveBeenCalledWith(USER_ID, true);
+  });
+
+  it('llama a upsertPrivacy con el userId y isPrivate=false', async () => {
+    await locationService.setPrivacyStatus(USER_ID, false);
+    expect(locationRepository.upsertPrivacy).toHaveBeenCalledWith(USER_ID, false);
+  });
+
+  // CA.1: activar modo privado
+  it('devuelve mensaje "Modo privado activado" e isPrivate=true al activar', async () => {
+    const result = await locationService.setPrivacyStatus(USER_ID, true);
+    expect(result).toEqual({ message: 'Modo privado activado', isPrivate: true });
+  });
+
+  // CA.2: desactivar modo privado
+  it('devuelve mensaje "Modo privado desactivado" e isPrivate=false al desactivar', async () => {
+    const result = await locationService.setPrivacyStatus(USER_ID, false);
+    expect(result).toEqual({ message: 'Modo privado desactivado', isPrivate: false });
+  });
+
+  // CA.3: cambio inmediato (upsertPrivacy llamado exactamente una vez)
+  it('CA.3: persiste el cambio en la misma llamada (upsertPrivacy invocado una sola vez)', async () => {
+    await locationService.setPrivacyStatus(USER_ID, true);
+    expect(locationRepository.upsertPrivacy).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// H5: getPrivacyStatus
+// ---------------------------------------------------------------------------
+describe('locationService.getPrivacyStatus', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('devuelve isPrivate: false si el usuario nunca configuró privacidad (default público)', async () => {
+    locationRepository.findPrivacyByUser.mockResolvedValue(null);
+    const result = await locationService.getPrivacyStatus(USER_ID);
+    expect(result).toEqual({ isPrivate: false });
+  });
+
+  it('devuelve isPrivate: true si el usuario tiene modo privado activo', async () => {
+    locationRepository.findPrivacyByUser.mockResolvedValue({ userId: USER_ID, isPrivate: true });
+    const result = await locationService.getPrivacyStatus(USER_ID);
+    expect(result).toEqual({ isPrivate: true });
+  });
+
+  it('devuelve isPrivate: false si el usuario tiene modo privado explícitamente desactivado', async () => {
+    locationRepository.findPrivacyByUser.mockResolvedValue({ userId: USER_ID, isPrivate: false });
+    const result = await locationService.getPrivacyStatus(USER_ID);
+    expect(result).toEqual({ isPrivate: false });
+  });
+
+  it('consulta el repositorio con el userId correcto', async () => {
+    locationRepository.findPrivacyByUser.mockResolvedValue(null);
+    await locationService.getPrivacyStatus(USER_ID);
+    expect(locationRepository.findPrivacyByUser).toHaveBeenCalledWith(USER_ID);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// H6: getRadar
+// ---------------------------------------------------------------------------
+describe('locationService.getRadar', () => {
+  // Posición del usuario que hace el radar (Buenos Aires centro)
+  const MY_COORDS = { latitude: -34.6037, longitude: -58.3816, radiusKm: 1 };
+
+  // Usuario a ~200m — dentro del radio de 1km
+  const NEAR_USER_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
+  const NEAR_USER_COORDS = { latitude: -34.605, longitude: -58.383 };
+
+  // Usuario a ~2.5km — fuera del radio de 1km pero dentro del bounding box
+  const FAR_USER_ID = 'dddddddd-dddd-dddd-dddd-dddddddddddd';
+  const FAR_USER_COORDS = { latitude: -34.62, longitude: -58.40 };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    friendsClient.getFriendIds.mockResolvedValue([FRIEND_ID]);
+    locationRepository.findNearbyUsers.mockResolvedValue([
+      { _id: NEAR_USER_ID, ...NEAR_USER_COORDS },
+    ]);
+    usersClient.getUserProfiles.mockResolvedValue([
+      { id: NEAR_USER_ID, username: 'usuario_cercano' },
+    ]);
+  });
+
+  // CA.1: consulta al servicio de friends para obtener los IDs a excluir
+  it('CA.1: llama a friendsClient.getFriendIds para obtener los amigos a excluir', async () => {
+    await locationService.getRadar(USER_ID, MY_COORDS);
+    expect(friendsClient.getFriendIds).toHaveBeenCalledWith(USER_ID);
+  });
+
+  it('excluye al propio usuario y a sus amigos de la búsqueda', async () => {
+    await locationService.getRadar(USER_ID, MY_COORDS);
+    expect(locationRepository.findNearbyUsers).toHaveBeenCalledWith(
+      MY_COORDS.latitude,
+      MY_COORDS.longitude,
+      MY_COORDS.radiusKm,
+      expect.arrayContaining([USER_ID, FRIEND_ID])
+    );
+  });
+
+  it('pasa el radiusKm recibido al repository (CA.2 — radio de preferencias)', async () => {
+    await locationService.getRadar(USER_ID, { ...MY_COORDS, radiusKm: 25 });
+    expect(locationRepository.findNearbyUsers).toHaveBeenCalledWith(
+      expect.any(Number), expect.any(Number), 25, expect.any(Array)
+    );
+  });
+
+  it('devuelve lista vacía si no hay usuarios cercanos', async () => {
+    locationRepository.findNearbyUsers.mockResolvedValue([]);
+    const result = await locationService.getRadar(USER_ID, MY_COORDS);
+    expect(result).toEqual({ users: [] });
+    expect(usersClient.getUserProfiles).not.toHaveBeenCalled();
+  });
+
+  it('devuelve lista vacía si el usuario sin amigos no tiene vecinos', async () => {
+    friendsClient.getFriendIds.mockResolvedValue([]);
+    locationRepository.findNearbyUsers.mockResolvedValue([]);
+    const result = await locationService.getRadar(USER_ID, MY_COORDS);
+    expect(result).toEqual({ users: [] });
+  });
+
+  // Filtro exacto por Haversine: el bounding box puede incluir usuarios fuera del radio real
+  it('filtra usuarios que están fuera del radio exacto (más allá del bounding box grueso)', async () => {
+    locationRepository.findNearbyUsers.mockResolvedValue([
+      { _id: NEAR_USER_ID, ...NEAR_USER_COORDS },   // ~200m → dentro del radio 1km
+      { _id: FAR_USER_ID, ...FAR_USER_COORDS },     // ~2.5km → fuera del radio 1km
+    ]);
+    usersClient.getUserProfiles.mockResolvedValue([
+      { id: NEAR_USER_ID, username: 'usuario_cercano' },
+      { id: FAR_USER_ID, username: 'usuario_lejano' },
+    ]);
+
+    const result = await locationService.getRadar(USER_ID, MY_COORDS);
+
+    const ids = result.users.map((u) => u.userId);
+    expect(ids).toContain(NEAR_USER_ID);
+    expect(ids).not.toContain(FAR_USER_ID);
+  });
+
+  it('llama a usersClient.getUserProfiles con los userIds de los usuarios dentro del radio', async () => {
+    await locationService.getRadar(USER_ID, MY_COORDS);
+    expect(usersClient.getUserProfiles).toHaveBeenCalledWith([NEAR_USER_ID]);
+  });
+
+  it('incluye userId, username, distance y distanceMeters en cada resultado', async () => {
+    const result = await locationService.getRadar(USER_ID, MY_COORDS);
+
+    expect(result.users).toHaveLength(1);
+    expect(result.users[0]).toMatchObject({
+      userId: NEAR_USER_ID,
+      username: 'usuario_cercano',
+      distanceMeters: expect.any(Number),
+      distance: expect.stringMatching(/km|m/),
+    });
+  });
+
+  it('devuelve distanceMeters positivo para usuarios cercanos', async () => {
+    const result = await locationService.getRadar(USER_ID, MY_COORDS);
+    expect(result.users[0].distanceMeters).toBeGreaterThan(0);
+  });
+
+  it('ordena los resultados por distancia ascendente', async () => {
+    // Dos usuarios dentro del radio, uno más cerca que el otro
+    const VERY_NEAR_ID = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
+    locationRepository.findNearbyUsers.mockResolvedValue([
+      { _id: NEAR_USER_ID, latitude: -34.607, longitude: -58.383 },   // ~400m
+      { _id: VERY_NEAR_ID, latitude: -34.604, longitude: -58.382 },   // ~100m
+    ]);
+    usersClient.getUserProfiles.mockResolvedValue([
+      { id: NEAR_USER_ID, username: 'segundo' },
+      { id: VERY_NEAR_ID, username: 'primero' },
+    ]);
+
+    const result = await locationService.getRadar(USER_ID, MY_COORDS);
+
+    expect(result.users[0].distanceMeters).toBeLessThanOrEqual(result.users[1].distanceMeters);
+  });
+
+  it('omite usuarios que no tienen perfil en el servicio de users', async () => {
+    const UNKNOWN_ID = 'ffffffff-ffff-ffff-ffff-ffffffffffff';
+    locationRepository.findNearbyUsers.mockResolvedValue([
+      { _id: NEAR_USER_ID, ...NEAR_USER_COORDS },
+      { _id: UNKNOWN_ID, ...NEAR_USER_COORDS },
+    ]);
+    // users service solo devuelve perfil de NEAR_USER_ID
+    usersClient.getUserProfiles.mockResolvedValue([
+      { id: NEAR_USER_ID, username: 'usuario_cercano' },
+    ]);
+
+    const result = await locationService.getRadar(USER_ID, MY_COORDS);
+
+    const ids = result.users.map((u) => u.userId);
+    expect(ids).toContain(NEAR_USER_ID);
+    expect(ids).not.toContain(UNKNOWN_ID);
   });
 });
 

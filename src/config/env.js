@@ -13,6 +13,9 @@ const envSchema = z.object({
 
   // H2 CA.2: URL del servicio de friends para verificar amistades antes de devolver ubicaciones
   FRIENDS_SERVICE_URL: z.string().url(),
+
+  // H5-friends: URL del servicio de users para resolver userIds → usernames en el radar
+  USERS_SERVICE_URL: z.string().url(),
 });
 
 const parsed = envSchema.safeParse(process.env);
