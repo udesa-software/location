@@ -24,6 +24,8 @@ jest.mock('../../../clients/friendsClient', () => ({
 jest.mock('../../../clients/usersClient', () => ({
   usersClient: {
     getUserProfiles: jest.fn(),
+    updateUserPrivacy: jest.fn(),
+    getPreferences: jest.fn(),
   },
 }));
 
@@ -252,6 +254,7 @@ describe('locationService.setPrivacyStatus', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     locationRepository.upsertPrivacy.mockResolvedValue({});
+    usersClient.updateUserPrivacy.mockResolvedValue(undefined);
   });
 
   it('llama a upsertPrivacy con el userId y isPrivate=true', async () => {
@@ -262,6 +265,17 @@ describe('locationService.setPrivacyStatus', () => {
   it('llama a upsertPrivacy con el userId y isPrivate=false', async () => {
     await locationService.setPrivacyStatus(USER_ID, false);
     expect(locationRepository.upsertPrivacy).toHaveBeenCalledWith(USER_ID, false);
+  });
+
+  // H5: sincroniza is_private al users service para filtrar el buscador
+  it('sincroniza is_private=true al users service', async () => {
+    await locationService.setPrivacyStatus(USER_ID, true);
+    expect(usersClient.updateUserPrivacy).toHaveBeenCalledWith(USER_ID, true);
+  });
+
+  it('sincroniza is_private=false al users service', async () => {
+    await locationService.setPrivacyStatus(USER_ID, false);
+    expect(usersClient.updateUserPrivacy).toHaveBeenCalledWith(USER_ID, false);
   });
 
   // CA.1: activar modo privado
@@ -321,7 +335,7 @@ describe('locationService.getPrivacyStatus', () => {
 // ---------------------------------------------------------------------------
 describe('locationService.getRadar', () => {
   // Posición del usuario que hace el radar (Buenos Aires centro)
-  const MY_COORDS = { latitude: -34.6037, longitude: -58.3816, radiusKm: 1 };
+  const MY_COORDS = { latitude: -34.6037, longitude: -58.3816 };
 
   // Usuario a ~200m — dentro del radio de 1km
   const NEAR_USER_ID = 'cccccccc-cccc-cccc-cccc-cccccccccccc';
@@ -334,6 +348,7 @@ describe('locationService.getRadar', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     friendsClient.getFriendIds.mockResolvedValue([FRIEND_ID]);
+    usersClient.getPreferences.mockResolvedValue({ search_radius_km: 1 });
     locationRepository.findNearbyUsers.mockResolvedValue([
       { _id: NEAR_USER_ID, ...NEAR_USER_COORDS },
     ]);
@@ -353,13 +368,16 @@ describe('locationService.getRadar', () => {
     expect(locationRepository.findNearbyUsers).toHaveBeenCalledWith(
       MY_COORDS.latitude,
       MY_COORDS.longitude,
-      MY_COORDS.radiusKm,
+      1, // search_radius_km del mock de getPreferences
       expect.arrayContaining([USER_ID, FRIEND_ID])
     );
   });
 
-  it('pasa el radiusKm recibido al repository (CA.2 — radio de preferencias)', async () => {
-    await locationService.getRadar(USER_ID, { ...MY_COORDS, radiusKm: 25 });
+  // CA.2: el radio viene de las preferencias del usuario, no del cliente
+  it('CA.2: usa el radio de preferencias del usuario (no del body del cliente)', async () => {
+    usersClient.getPreferences.mockResolvedValue({ search_radius_km: 25 });
+    await locationService.getRadar(USER_ID, MY_COORDS);
+    expect(usersClient.getPreferences).toHaveBeenCalledWith(USER_ID);
     expect(locationRepository.findNearbyUsers).toHaveBeenCalledWith(
       expect.any(Number), expect.any(Number), 25, expect.any(Array)
     );

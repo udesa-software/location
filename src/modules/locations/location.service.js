@@ -111,8 +111,10 @@ const locationService = {
   },
 
   // H5 CA.1/CA.2/CA.3: activa o desactiva el modo privado del usuario.
+  // Sincroniza también en users service (PostgreSQL) para que el buscador lo filtre.
   async setPrivacyStatus(userId, isPrivate) {
     await locationRepository.upsertPrivacy(userId, isPrivate);
+    await usersClient.updateUserPrivacy(userId, isPrivate);
     return {
       message: isPrivate ? 'Modo privado activado' : 'Modo privado desactivado',
       isPrivate,
@@ -126,9 +128,13 @@ const locationService = {
   },
 
   // H6: devuelve usuarios cercanos que no son amigos del userId y tienen modo privado desactivado.
-  // CA.2: radiusKm viene de las preferencias del usuario (enviado por el cliente).
-  async getRadar(userId, { latitude, longitude, radiusKm }) {
-    const friendIds = await friendsClient.getFriendIds(userId);
+  // CA.2: el radio se lee de las preferencias del usuario en users service (no viene del cliente).
+  async getRadar(userId, { latitude, longitude }) {
+    const [friendIds, prefs] = await Promise.all([
+      friendsClient.getFriendIds(userId),
+      usersClient.getPreferences(userId),
+    ]);
+    const radiusKm = prefs?.search_radius_km ?? 25;
     const excludeUserIds = [userId, ...friendIds];
 
     const nearby = await locationRepository.findNearbyUsers(latitude, longitude, radiusKm, excludeUserIds);

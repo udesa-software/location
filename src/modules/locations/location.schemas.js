@@ -47,7 +47,8 @@ const setPrivacySchema = z.object({
   isPrivate: z.boolean({ required_error: 'isPrivate es obligatorio', invalid_type_error: 'isPrivate debe ser un booleano' }),
 });
 
-// H6: body del radar de descubrimiento — coordenadas + radio configurado por el usuario
+// H6: body del radar de descubrimiento — solo coordenadas del cliente.
+// CA.2: el radio lo lee el backend de las preferencias del usuario (no viene del cliente).
 const radarSchema = z.object({
   latitude: z
     .number({ required_error: 'La latitud es obligatoria', invalid_type_error: 'La latitud debe ser un número' })
@@ -55,11 +56,6 @@ const radarSchema = z.object({
   longitude: z
     .number({ required_error: 'La longitud es obligatoria', invalid_type_error: 'La longitud debe ser un número' })
     .min(-180).max(180),
-  // CA.2: radio en km configurado en preferencias (mismo rango que search_radius_km: 1-50)
-  radiusKm: z
-    .number({ required_error: 'El radio es obligatorio', invalid_type_error: 'El radio debe ser un número' })
-    .min(1, 'El radio mínimo es 1 km')
-    .max(50, 'El radio máximo es 50 km'),
 });
 
 module.exports = { updateLocationSchema, getFriendsLocationsSchema, updateLabelSchema, setPrivacySchema, radarSchema };
