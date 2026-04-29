@@ -20,6 +20,36 @@ const locationController = {
     }
   },
 
+  // H5: activar/desactivar modo privado
+  async setPrivacyStatus(req, res, next) {
+    try {
+      const result = await locationService.setPrivacyStatus(req.user.sub, req.body.isPrivate);
+      res.status(200).json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // H5: consultar estado del modo privado
+  async getPrivacyStatus(req, res, next) {
+    try {
+      const result = await locationService.getPrivacyStatus(req.user.sub);
+      res.status(200).json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  // H6: radar de usuarios cercanos no-amigos con modo privado desactivado
+  async getRadar(req, res, next) {
+    try {
+      const result = await locationService.getRadar(req.user.sub, req.body);
+      res.status(200).json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+
   // H7: crear/actualizar etiqueta de lugar manual
   async updateLabel(req, res, next) {
     try {

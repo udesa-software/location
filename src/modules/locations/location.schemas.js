@@ -42,4 +42,20 @@ const updateLabelSchema = z.object({
     .optional(),
 });
 
-module.exports = { updateLocationSchema, getFriendsLocationsSchema, updateLabelSchema };
+// H5: body para activar/desactivar el modo privado
+const setPrivacySchema = z.object({
+  isPrivate: z.boolean({ required_error: 'isPrivate es obligatorio', invalid_type_error: 'isPrivate debe ser un booleano' }),
+});
+
+// H6: body del radar de descubrimiento — solo coordenadas del cliente.
+// CA.2: el radio lo lee el backend de las preferencias del usuario (no viene del cliente).
+const radarSchema = z.object({
+  latitude: z
+    .number({ required_error: 'La latitud es obligatoria', invalid_type_error: 'La latitud debe ser un número' })
+    .min(-90).max(90),
+  longitude: z
+    .number({ required_error: 'La longitud es obligatoria', invalid_type_error: 'La longitud debe ser un número' })
+    .min(-180).max(180),
+});
+
+module.exports = { updateLocationSchema, getFriendsLocationsSchema, updateLabelSchema, setPrivacySchema, radarSchema };

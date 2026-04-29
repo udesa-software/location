@@ -47,4 +47,25 @@ locationSchema.index({ userId: 1, createdAt: -1 });
 
 const Location = mongoose.model('Location', locationSchema);
 
-module.exports = { Location };
+// H5: un documento por usuario. isPrivate: false por defecto (público si no existe registro).
+const locationPrivacySchema = new mongoose.Schema(
+  {
+    userId: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+    },
+    isPrivate: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  {
+    timestamps: { createdAt: false, updatedAt: true },
+  }
+);
+
+const LocationPrivacy = mongoose.model('LocationPrivacy', locationPrivacySchema);
+
+module.exports = { Location, LocationPrivacy };
