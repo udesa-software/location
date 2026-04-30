@@ -11,6 +11,6 @@ spec:
     app: location
   ports:
     - name: http
-      port: 3002
-      targetPort: 3002
+      port: 3000
+      targetPort: 3000
       protocol: TCP

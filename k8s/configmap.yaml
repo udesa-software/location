@@ -4,5 +4,6 @@ metadata:
   name: location-config
   namespace: tds-group-3
 data:
-  PORT: "3002"
+  PORT: "3000"
   MIN_UPDATE_INTERVAL_SECONDS: "60"
+  FRIENDS_SERVICE_URL: "http://friends:3000"
