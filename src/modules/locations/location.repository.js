@@ -38,6 +38,23 @@ const locationRepository = {
           updatedAt: { $first: '$createdAt' },
         },
       },
+      // H5 CA.2: filtrar amigos que tienen el modo privado activo
+      {
+        $lookup: {
+          from: 'locationprivacies',
+          localField: '_id',
+          foreignField: 'userId',
+          as: 'privacy',
+        },
+      },
+      {
+        $match: {
+          $or: [
+            { privacy: { $size: 0 } },
+            { 'privacy.0.isPrivate': false },
+          ],
+        },
+      },
     ]);
   },
 

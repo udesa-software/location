@@ -114,7 +114,7 @@ const locationService = {
       };
     });
 
-    return { friends };
+    return { friends: friends.sort((a, b) => a.distanceMeters - b.distanceMeters) };
   },
 
   // H5 CA.1/CA.2/CA.3: activa o desactiva el modo privado del usuario.
