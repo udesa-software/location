@@ -86,20 +86,27 @@ const locationService = {
       return { friends: [] };
     }
 
-    const locations = await locationRepository.findLastByUsers(friendIds);
+    const [locations, profiles] = await Promise.all([
+      locationRepository.findLastByUsers(friendIds),
+      usersClient.getUserProfiles(friendIds)
+    ]);
 
-    // H7 CA.4: la distancia ya se invalida en updateLocation (cuando el amigo mueve el celular).
-    // Acá solo chequeamos tiempo: si pasaron más de 6h sin que actualice, ocultamos la etiqueta.
+    // Mapa de usernames asegurando que el ID sea string
+    const profileMap = new Map(profiles.map(p => [String(p.id), p.username]));
+
     const sixHoursMs = 6 * 60 * 60 * 1000;
 
     const friends = locations.map((loc) => {
+      const friendId = String(loc._id);
+      const username = profileMap.get(friendId) || 'Usuario';
       const distanceMeters = haversineMeters(latitude, longitude, loc.latitude, loc.longitude);
       const labelValid = loc.label && loc.labelCreatedAt &&
         (Date.now() - new Date(loc.labelCreatedAt).getTime() <= sixHoursMs);
       return {
-        userId: loc._id,
-        latitude: loc.latitude,
-        longitude: loc.longitude,
+        userId: friendId,
+        username,
+        latitude: Number(loc.latitude),
+        longitude: Number(loc.longitude),
         distanceMeters: Math.round(distanceMeters),
         distance: formatDistance(distanceMeters),
         label: labelValid ? loc.label : null,

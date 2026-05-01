@@ -2,10 +2,8 @@ const { env } = require('../config/env');
 const { AppError } = require('../middlewares/errorHandler');
 
 const usersClient = {
-  // Devuelve los perfiles (id + username) de una lista de userIds.
-  // Llama al endpoint interno del users service (sin autenticación — red Docker privada).
   async getUserProfiles(userIds) {
-    if (!userIds.length) return [];
+    if (!userIds || !userIds.length) return [];
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 8000);
