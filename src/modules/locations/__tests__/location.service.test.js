@@ -175,6 +175,9 @@ describe('locationService.getFriendsLocations', () => {
         updatedAt: new Date(),
       },
     ]);
+    usersClient.getUserProfiles.mockResolvedValue([
+      { id: FRIEND_ID, username: 'amigo_test' }
+    ]);
   });
 
   it('devuelve las ubicaciones de los amigos con distancia calculada', async () => {
@@ -244,6 +247,30 @@ describe('locationService.getFriendsLocations', () => {
     const result = await locationService.getFriendsLocations(USER_ID, VALID_COORDS);
 
     expect(result.friends[0].label).toBe('En la facu');
+  });
+
+  it('devuelve la lista de amigos ordenada por cercanía (ascendente)', async () => {
+    const FRIEND_NEAR = 'near-id';
+    const FRIEND_FAR = 'far-id';
+    
+    friendsClient.getFriendIds.mockResolvedValue([FRIEND_NEAR, FRIEND_FAR]);
+    
+    locationRepository.findLastByUsers.mockResolvedValue([
+      { _id: FRIEND_FAR, latitude: -34.70, longitude: -58.50, updatedAt: new Date() },
+      { _id: FRIEND_NEAR, latitude: -34.61, longitude: -58.39, updatedAt: new Date() }
+    ]);
+
+    usersClient.getUserProfiles.mockResolvedValue([
+      { id: FRIEND_NEAR, username: 'cercano' },
+      { id: FRIEND_FAR, username: 'lejano' }
+    ]);
+
+    const result = await locationService.getFriendsLocations(USER_ID, VALID_COORDS);
+
+    expect(result.friends).toHaveLength(2);
+    expect(result.friends[0].userId).toBe(FRIEND_NEAR);
+    expect(result.friends[1].userId).toBe(FRIEND_FAR);
+    expect(result.friends[0].distanceMeters).toBeLessThan(result.friends[1].distanceMeters);
   });
 });
 
