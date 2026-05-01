@@ -7,3 +7,4 @@ data:
   PORT: "3000"
   MIN_UPDATE_INTERVAL_SECONDS: "60"
   FRIENDS_SERVICE_URL: "http://friends:3000"
+  USERS_SERVICE_URL: "http://users:3000"
