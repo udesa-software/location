@@ -17,7 +17,7 @@ async function authenticate(req, _res, next) {
 
     // Solo usuarios regulares pueden enviar ubicación (no admins)
     if (payload.role) {
-      return next(new AppError(403, 'Acceso denegado'));
+      return next(new AppError(401, 'Acceso denegado'));
     }
 
     req.user = payload;
