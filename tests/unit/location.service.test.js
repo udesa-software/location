@@ -1,9 +1,9 @@
-const { locationService } = require('../location.service');
-const { locationRepository } = require('../location.repository');
-const { friendsClient } = require('../../../clients/friendsClient');
-const { usersClient } = require('../../../clients/usersClient');
+const { locationService } = require('../../src/modules/locations/location.service');
+const { locationRepository } = require('../../src/modules/locations/location.repository');
+const { friendsClient } = require('../../src/clients/friendsClient');
+const { usersClient } = require('../../src/clients/usersClient');
 
-jest.mock('../location.repository', () => ({
+jest.mock('../../src/modules/locations/location.repository', () => ({
   locationRepository: {
     findLastByUser: jest.fn(),
     findLastByUsers: jest.fn(),
@@ -15,13 +15,13 @@ jest.mock('../location.repository', () => ({
   },
 }));
 
-jest.mock('../../../clients/friendsClient', () => ({
+jest.mock('../../src/clients/friendsClient', () => ({
   friendsClient: {
     getFriendIds: jest.fn(),
   },
 }));
 
-jest.mock('../../../clients/usersClient', () => ({
+jest.mock('../../src/clients/usersClient', () => ({
   usersClient: {
     getUserProfiles: jest.fn(),
     updateUserPrivacy: jest.fn(),
@@ -29,7 +29,7 @@ jest.mock('../../../clients/usersClient', () => ({
   },
 }));
 
-jest.mock('../../../config/env', () => ({
+jest.mock('../../src/config/env', () => ({
   env: {
     MIN_UPDATE_INTERVAL_SECONDS: '60',
     FRIENDS_SERVICE_URL: 'http://friends:3001',
@@ -252,9 +252,9 @@ describe('locationService.getFriendsLocations', () => {
   it('devuelve la lista de amigos ordenada por cercanía (ascendente)', async () => {
     const FRIEND_NEAR = 'near-id';
     const FRIEND_FAR = 'far-id';
-    
+
     friendsClient.getFriendIds.mockResolvedValue([FRIEND_NEAR, FRIEND_FAR]);
-    
+
     locationRepository.findLastByUsers.mockResolvedValue([
       { _id: FRIEND_FAR, latitude: -34.70, longitude: -58.50, updatedAt: new Date() },
       { _id: FRIEND_NEAR, latitude: -34.61, longitude: -58.39, updatedAt: new Date() }
