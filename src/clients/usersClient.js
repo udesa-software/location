@@ -77,6 +77,26 @@ const usersClient = {
       clearTimeout(timer);
     }
   },
+
+  // Obtiene el detalle completo del usuario (username, biografía, last_seen_at)
+  async getUserDetail(userId) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetch(
+        `${env.USERS_SERVICE_URL}/internal/users/${userId}`,
+        { signal: controller.signal }
+      );
+      if (!response.ok) throw new AppError(502, 'Error al obtener detalle del usuario');
+      return await response.json();
+    } catch (err) {
+      if (err.name === 'AbortError') throw new AppError(504, 'Timeout al obtener detalle del usuario');
+      if (err instanceof AppError) throw err;
+      throw new AppError(502, 'Error de comunicación con el servicio de usuarios');
+    } finally {
+      clearTimeout(timer);
+    }
+  },
 };
 
 module.exports = { usersClient };

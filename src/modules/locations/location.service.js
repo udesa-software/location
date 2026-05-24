@@ -201,6 +201,58 @@ const locationService = {
 
     return { message: sanitized ? 'Etiqueta actualizada' : 'Etiqueta eliminada' };
   },
+
+  // Obtiene el perfil consolidado de un amigo (biografía, presencia online, y sus últimas 10 ubicaciones si no está en modo privado)
+  async getFriendProfile(userId, friendId) {
+    if (userId === friendId) {
+      throw new AppError(400, 'No podés ver tu propio perfil de amigo');
+    }
+
+    // 1. Validar relación de amistad activa (CA.1)
+    const friendIds = await friendsClient.getFriendIds(userId);
+    if (!friendIds.includes(friendId)) {
+      throw new AppError(400, 'Solo podés ver el perfil de tus amigos');
+    }
+
+    // 2. Obtener detalles de perfil del servicio de usuarios
+    const profile = await usersClient.getUserDetail(friendId);
+    if (!profile) {
+      throw new AppError(400, 'No se encontró el perfil de este usuario');
+    }
+
+    // 3. Determinar presencia en tiempo real
+    let isOnline = false;
+    if (profile.last_seen_at) {
+      const fiveMinutesMs = 5 * 60 * 1000;
+      isOnline = (Date.now() - new Date(profile.last_seen_at).getTime()) <= fiveMinutesMs;
+    }
+
+    // 4. Verificar estado del modo privado (CA.3)
+    const privacy = await locationRepository.findPrivacyByUser(friendId);
+    const isPrivate = privacy?.isPrivate ?? false;
+
+    let locationHistory = [];
+    if (!isPrivate) {
+      // CA.2, CA.4: Obtener las últimas 10 ubicaciones ordenadas cronológicamente DESC
+      const history = await locationRepository.findHistoryByUser(friendId, 10);
+      locationHistory = history.map(loc => ({
+        latitude: loc.latitude,
+        longitude: loc.longitude,
+        label: loc.label,
+        createdAt: loc.createdAt
+      }));
+    }
+
+    return {
+      id: profile.id,
+      username: profile.username,
+      biography: profile.biography || '',
+      is_online: isOnline,
+      last_seen_at: profile.last_seen_at,
+      isHistoryPrivate: isPrivate,
+      location_history: locationHistory
+    };
+  },
 };
 
 module.exports = { locationService };

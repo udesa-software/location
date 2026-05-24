@@ -69,6 +69,16 @@ const locationController = {
       next(err);
     }
   },
+
+  // Obtener perfil detallado de amigo (biografía, presencia, historial de ubicaciones)
+  async getFriendProfile(req, res, next) {
+    try {
+      const result = await locationService.getFriendProfile(req.user.sub, req.params.friendId);
+      res.status(200).json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
 };
 
 module.exports = { locationController };
