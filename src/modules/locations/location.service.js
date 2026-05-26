@@ -216,7 +216,7 @@ const locationService = {
 
     // 2. Obtener detalles de perfil del servicio de usuarios
     const profile = await usersClient.getUserDetail(friendId);
-    if (!profile) {
+    if (!profile || profile.is_suspended || profile.deleted_at) {
       throw new AppError(400, 'No se encontró el perfil de este usuario');
     }
 
