@@ -28,4 +28,7 @@ router.put('/label', authenticate, validate(updateLabelSchema), locationControll
 // DELETE /api/locations/label — H7 CA.3: borrar etiqueta
 router.delete('/label', authenticate, locationController.deleteLabel);
 
+// GET /api/locations/friends/:friendId/profile — Visualizar perfil detallado (biografía, presencia, e historial) de un amigo
+router.get('/friends/:friendId/profile', authenticate, locationController.getFriendProfile);
+
 module.exports = router;

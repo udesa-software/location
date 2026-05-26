@@ -135,6 +135,14 @@ const locationRepository = {
       { sort: { createdAt: -1 }, new: true }
     ).lean();
   },
+
+  // Obtiene el historial de ubicaciones del usuario ordenado por fecha de creación descendente
+  async findHistoryByUser(userId, limit = 10) {
+    return Location.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+  },
 };
 
 module.exports = { locationRepository };

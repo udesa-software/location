@@ -12,6 +12,7 @@ jest.mock('../location.repository', () => ({
     upsertPrivacy: jest.fn(),
     save: jest.fn(),
     updateLabel: jest.fn(),
+    findHistoryByUser: jest.fn(),
   },
 }));
 
@@ -26,6 +27,7 @@ jest.mock('../../../clients/usersClient', () => ({
     getUserProfiles: jest.fn(),
     updateUserPrivacy: jest.fn(),
     getPreferences: jest.fn(),
+    getUserDetail: jest.fn(),
   },
 }));
 
@@ -560,5 +562,83 @@ describe('locationService.updateLabel', () => {
   it('retorna mensaje de eliminación cuando label es null', async () => {
     const result = await locationService.updateLabel(USER_ID, { label: null });
     expect(result.message).toBe('Etiqueta eliminada');
+  });
+});
+
+describe('locationService.getFriendProfile', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('lanza 400 si se intenta consultar su propio perfil', async () => {
+    await expect(locationService.getFriendProfile(USER_ID, USER_ID))
+      .rejects.toMatchObject({ statusCode: 400, message: 'No podés ver tu propio perfil de amigo' });
+  });
+
+  it('lanza 400 si no son amigos', async () => {
+    friendsClient.getFriendIds.mockResolvedValue([]);
+    await expect(locationService.getFriendProfile(USER_ID, FRIEND_ID))
+      .rejects.toMatchObject({ statusCode: 400, message: 'Solo podés ver el perfil de tus amigos' });
+  });
+
+  it('lanza 400 si el perfil de usuario no existe', async () => {
+    friendsClient.getFriendIds.mockResolvedValue([FRIEND_ID]);
+    usersClient.getUserDetail.mockResolvedValue(null);
+
+    await expect(locationService.getFriendProfile(USER_ID, FRIEND_ID))
+      .rejects.toMatchObject({ statusCode: 400, message: 'No se encontró el perfil de este usuario' });
+  });
+
+  it('devuelve el perfil con historial si el amigo no es privado y está online', async () => {
+    friendsClient.getFriendIds.mockResolvedValue([FRIEND_ID]);
+    usersClient.getUserDetail.mockResolvedValue({
+      id: FRIEND_ID,
+      username: 'amigo_juan',
+      biography: 'Hola, soy Juan',
+      last_seen_at: new Date().toISOString()
+    });
+    locationRepository.findPrivacyByUser.mockResolvedValue({ isPrivate: false });
+    locationRepository.findHistoryByUser.mockResolvedValue([
+      { latitude: -34.6, longitude: -58.4, label: 'Lugar A', createdAt: new Date() }
+    ]);
+
+    const result = await locationService.getFriendProfile(USER_ID, FRIEND_ID);
+
+    expect(result).toEqual(expect.objectContaining({
+      id: FRIEND_ID,
+      username: 'amigo_juan',
+      biography: 'Hola, soy Juan',
+      is_online: true,
+      isHistoryPrivate: false,
+      location_history: [
+        expect.objectContaining({ latitude: -34.6, longitude: -58.4, label: 'Lugar A' })
+      ]
+    }));
+  });
+
+  it('devuelve el perfil con historia privada y vacía si el amigo es privado y está offline', async () => {
+    friendsClient.getFriendIds.mockResolvedValue([FRIEND_ID]);
+    // last_seen_at hace 10 minutos
+    const lastSeen = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    usersClient.getUserDetail.mockResolvedValue({
+      id: FRIEND_ID,
+      username: 'amigo_juan',
+      biography: 'Hola, soy Juan',
+      last_seen_at: lastSeen
+    });
+    locationRepository.findPrivacyByUser.mockResolvedValue({ isPrivate: true });
+
+    const result = await locationService.getFriendProfile(USER_ID, FRIEND_ID);
+
+    expect(result).toEqual({
+      id: FRIEND_ID,
+      username: 'amigo_juan',
+      biography: 'Hola, soy Juan',
+      is_online: false,
+      last_seen_at: lastSeen,
+      isHistoryPrivate: true,
+      location_history: []
+    });
+    expect(locationRepository.findHistoryByUser).not.toHaveBeenCalled();
   });
 });
