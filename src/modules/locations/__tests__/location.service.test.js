@@ -641,4 +641,29 @@ describe('locationService.getFriendProfile', () => {
     });
     expect(locationRepository.findHistoryByUser).not.toHaveBeenCalled();
   });
+
+  it('devuelve is_online: false y conserva last_seen_at si el amigo es privado (Modo Fantasma) aunque haya interactuado recientemente (CA.3)', async () => {
+    friendsClient.getFriendIds.mockResolvedValue([FRIEND_ID]);
+    // last_seen_at hace 2 minutos — el heartbeat no actualizó este campo porque el usuario es privado
+    const lastSeen = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    usersClient.getUserDetail.mockResolvedValue({
+      id: FRIEND_ID,
+      username: 'amigo_juan',
+      biography: 'Hola, soy Juan',
+      last_seen_at: lastSeen
+    });
+    locationRepository.findPrivacyByUser.mockResolvedValue({ isPrivate: true });
+
+    const result = await locationService.getFriendProfile(USER_ID, FRIEND_ID);
+
+    expect(result).toEqual({
+      id: FRIEND_ID,
+      username: 'amigo_juan',
+      biography: 'Hola, soy Juan',
+      is_online: false,
+      last_seen_at: lastSeen,
+      isHistoryPrivate: true,
+      location_history: []
+    });
+  });
 });
