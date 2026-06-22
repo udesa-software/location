@@ -9,7 +9,7 @@ const locationRepository = {
   // Guarda una nueva actualización de ubicación.
   // Si el usuario tiene una etiqueta activa en el documento anterior, la transfiere
   // para que no se pierda al crear una nueva entrada de coordenadas.
-  async save(userId, latitude, longitude, labelData = null) {
+  async save(userId, latitude, longitude, labelData = null, pinColor = null) {
     return Location.create({
       userId,
       latitude,
@@ -18,6 +18,7 @@ const locationRepository = {
       labelLatitude: labelData?.labelLatitude ?? null,
       labelLongitude: labelData?.labelLongitude ?? null,
       labelCreatedAt: labelData?.labelCreatedAt ?? null,
+      pinColor,
     });
   },
 
@@ -35,6 +36,7 @@ const locationRepository = {
           longitude: { $first: '$longitude' },
           label: { $first: '$label' },
           labelCreatedAt: { $first: '$labelCreatedAt' },
+          pinColor: { $first: '$pinColor' },
           updatedAt: { $first: '$createdAt' },
         },
       },
@@ -102,6 +104,15 @@ const locationRepository = {
         },
       },
     ]);
+  },
+
+  // H9: actualiza el color del pin en el documento más reciente del usuario
+  async updatePinColor(userId, pinColor) {
+    return Location.findOneAndUpdate(
+      { userId },
+      { $set: { pinColor } },
+      { sort: { createdAt: -1 }, new: true }
+    ).lean();
   },
 
   // H5: devuelve el registro de privacidad del usuario, o null si no existe (=público por defecto)

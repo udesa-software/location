@@ -2,7 +2,7 @@ const { Router } = require('express');
 const { locationController } = require('./location.controller');
 const { validate } = require('../../middlewares/validate');
 const { authenticate } = require('../../middlewares/authenticate');
-const { updateLocationSchema, getFriendsLocationsSchema, updateLabelSchema, setPrivacySchema, radarSchema } = require('./location.schemas');
+const { updateLocationSchema, getFriendsLocationsSchema, updateLabelSchema, setPrivacySchema, radarSchema, updatePinColorSchema } = require('./location.schemas');
 
 const router = Router();
 
@@ -27,6 +27,9 @@ router.put('/label', authenticate, validate(updateLabelSchema), locationControll
 
 // DELETE /api/locations/label — H7 CA.3: borrar etiqueta
 router.delete('/label', authenticate, locationController.deleteLabel);
+
+// PATCH /api/locations/pin-color — H9: guardar el color del pin del usuario
+router.patch('/pin-color', authenticate, validate(updatePinColorSchema), locationController.updatePinColor);
 
 // GET /api/locations/friends/:friendId/profile — Visualizar perfil detallado (biografía, presencia, e historial) de un amigo
 router.get('/friends/:friendId/profile', authenticate, locationController.getFriendProfile);

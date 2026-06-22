@@ -58,4 +58,12 @@ const radarSchema = z.object({
     .min(-180).max(180),
 });
 
-module.exports = { updateLocationSchema, getFriendsLocationsSchema, updateLabelSchema, setPrivacySchema, radarSchema };
+// H9 CA.1: solo los 5 colores predefinidos de la paleta son válidos
+const updatePinColorSchema = z.object({
+  pinColor: z.string().refine(
+    (val) => ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7'].includes(val),
+    { message: 'Color de pin no válido. Usá uno de la paleta predefinida.' }
+  ),
+});
+
+module.exports = { updateLocationSchema, getFriendsLocationsSchema, updateLabelSchema, setPrivacySchema, radarSchema, updatePinColorSchema };

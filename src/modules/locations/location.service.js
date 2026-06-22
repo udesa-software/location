@@ -40,6 +40,9 @@ function isLabelStillValid(location, currentLat, currentLon) {
   return true;
 }
 
+// H9 CA.1: paleta predefinida de 5 colores válidos para el pin
+const VALID_PIN_COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7'];
+
 const locationService = {
   // H1: actualizar ubicación del usuario
   async updateLocation(userId, { latitude, longitude, locationUpdateFrequency }) {
@@ -73,7 +76,10 @@ const locationService = {
       };
     }
 
-    await locationRepository.save(userId, latitude, longitude, labelData);
+    // H9 CA.2: propagar el color del pin del documento anterior al nuevo
+    const pinColor = lastLocation?.pinColor ?? null;
+
+    await locationRepository.save(userId, latitude, longitude, labelData, pinColor);
     return { message: 'Ubicación actualizada' };
   },
 
@@ -110,6 +116,7 @@ const locationService = {
         distanceMeters: Math.round(distanceMeters),
         distance: formatDistance(distanceMeters),
         label: labelValid ? loc.label : null,
+        pinColor: loc.pinColor ?? null,
         updatedAt: loc.updatedAt,
       };
     });
@@ -200,6 +207,20 @@ const locationService = {
     );
 
     return { message: sanitized ? 'Etiqueta actualizada' : 'Etiqueta eliminada' };
+  },
+
+  // H9 CA.2: guarda el color del pin elegido por el usuario.
+  // Solo acepta colores de la paleta predefinida (CA.1).
+  async updatePinColor(userId, { pinColor }) {
+    if (!VALID_PIN_COLORS.includes(pinColor)) {
+      throw new AppError(400, 'Color de pin no válido. Elegí uno de la paleta disponible.');
+    }
+    const lastLocation = await locationRepository.findLastByUser(userId);
+    if (!lastLocation) {
+      throw new AppError(400, 'Debés enviar tu ubicación antes de elegir un color de pin');
+    }
+    await locationRepository.updatePinColor(userId, pinColor);
+    return { message: 'Color de pin actualizado', pinColor };
   },
 
   // Obtiene el perfil consolidado de un amigo (biografía, presencia online, y sus últimas 10 ubicaciones si no está en modo privado)

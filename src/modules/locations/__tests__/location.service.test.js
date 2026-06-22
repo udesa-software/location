@@ -12,6 +12,7 @@ jest.mock('../location.repository', () => ({
     upsertPrivacy: jest.fn(),
     save: jest.fn(),
     updateLabel: jest.fn(),
+    updatePinColor: jest.fn(),
     findHistoryByUser: jest.fn(),
   },
 }));
@@ -54,7 +55,7 @@ describe('locationService.updateLocation', () => {
     const result = await locationService.updateLocation(USER_ID, VALID_COORDS);
 
     expect(locationRepository.save).toHaveBeenCalledWith(
-      USER_ID, VALID_COORDS.latitude, VALID_COORDS.longitude, null
+      USER_ID, VALID_COORDS.latitude, VALID_COORDS.longitude, null, null
     );
     expect(result).toEqual({ message: 'Ubicación actualizada' });
   });
@@ -98,7 +99,7 @@ describe('locationService.updateLocation', () => {
     await locationService.updateLocation(USER_ID, VALID_COORDS);
 
     expect(locationRepository.save).toHaveBeenCalledWith(
-      USER_ID, expect.any(Number), expect.any(Number), null
+      USER_ID, expect.any(Number), expect.any(Number), null, null
     );
   });
 
@@ -140,7 +141,8 @@ describe('locationService.updateLocation', () => {
       USER_ID,
       VALID_COORDS.latitude,
       VALID_COORDS.longitude,
-      expect.objectContaining({ label: 'En la facu' })
+      expect.objectContaining({ label: 'En la facu' }),
+      null
     );
   });
 
@@ -158,7 +160,21 @@ describe('locationService.updateLocation', () => {
     await locationService.updateLocation(USER_ID, VALID_COORDS);
 
     expect(locationRepository.save).toHaveBeenCalledWith(
-      USER_ID, VALID_COORDS.latitude, VALID_COORDS.longitude, null
+      USER_ID, VALID_COORDS.latitude, VALID_COORDS.longitude, null, null
+    );
+  });
+
+  // H9 CA.2: pinColor del doc anterior se propaga al nuevo
+  it('propaga el pinColor del documento anterior al guardar nueva ubicación (H9 CA.2)', async () => {
+    locationRepository.findLastByUser.mockResolvedValue({
+      createdAt: new Date(Date.now() - 120 * 1000),
+      pinColor: '#4ECDC4',
+    });
+
+    await locationService.updateLocation(USER_ID, VALID_COORDS);
+
+    expect(locationRepository.save).toHaveBeenCalledWith(
+      USER_ID, VALID_COORDS.latitude, VALID_COORDS.longitude, null, '#4ECDC4'
     );
   });
 });
@@ -249,6 +265,43 @@ describe('locationService.getFriendsLocations', () => {
     const result = await locationService.getFriendsLocations(USER_ID, VALID_COORDS);
 
     expect(result.friends[0].label).toBe('En la facu');
+  });
+
+  // H9 CA.2: pinColor del amigo se incluye en la respuesta
+  it('incluye pinColor en la respuesta de cada amigo (H9 CA.2)', async () => {
+    locationRepository.findLastByUsers.mockResolvedValue([
+      {
+        _id: FRIEND_ID,
+        latitude: -34.61,
+        longitude: -58.39,
+        label: null,
+        labelCreatedAt: null,
+        pinColor: '#4ECDC4',
+        updatedAt: new Date(),
+      },
+    ]);
+
+    const result = await locationService.getFriendsLocations(USER_ID, VALID_COORDS);
+
+    expect(result.friends[0].pinColor).toBe('#4ECDC4');
+  });
+
+  it('retorna pinColor null si el amigo no tiene color configurado', async () => {
+    locationRepository.findLastByUsers.mockResolvedValue([
+      {
+        _id: FRIEND_ID,
+        latitude: -34.61,
+        longitude: -58.39,
+        label: null,
+        labelCreatedAt: null,
+        pinColor: null,
+        updatedAt: new Date(),
+      },
+    ]);
+
+    const result = await locationService.getFriendsLocations(USER_ID, VALID_COORDS);
+
+    expect(result.friends[0].pinColor).toBeNull();
   });
 
   it('devuelve la lista de amigos ordenada por cercanía (ascendente)', async () => {
@@ -562,6 +615,62 @@ describe('locationService.updateLabel', () => {
   it('retorna mensaje de eliminación cuando label es null', async () => {
     const result = await locationService.updateLabel(USER_ID, { label: null });
     expect(result.message).toBe('Etiqueta eliminada');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// H9: updatePinColor
+// ---------------------------------------------------------------------------
+describe('locationService.updatePinColor', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    locationRepository.findLastByUser.mockResolvedValue({ ...VALID_COORDS, createdAt: new Date() });
+    locationRepository.updatePinColor.mockResolvedValue({});
+  });
+
+  // CA.1: solo colores de la paleta predefinida son válidos
+  it('CA.1: lanza 400 si se envía un color fuera de la paleta predefinida', async () => {
+    await expect(locationService.updatePinColor(USER_ID, { pinColor: '#000000' }))
+      .rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it('CA.1: lanza 400 si el color está vacío', async () => {
+    await expect(locationService.updatePinColor(USER_ID, { pinColor: '' }))
+      .rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it('lanza 400 si el usuario no tiene ubicación registrada', async () => {
+    locationRepository.findLastByUser.mockResolvedValue(null);
+
+    await expect(locationService.updatePinColor(USER_ID, { pinColor: '#FF6B6B' }))
+      .rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it('no llama a updatePinColor del repositorio si el color no es válido', async () => {
+    await expect(locationService.updatePinColor(USER_ID, { pinColor: 'rojo' })).rejects.toThrow();
+    expect(locationRepository.updatePinColor).not.toHaveBeenCalled();
+  });
+
+  it('CA.2: llama a updatePinColor del repositorio con el userId y color correctos', async () => {
+    await locationService.updatePinColor(USER_ID, { pinColor: '#FF6B6B' });
+
+    expect(locationRepository.updatePinColor).toHaveBeenCalledWith(USER_ID, '#FF6B6B');
+  });
+
+  it('CA.2: retorna el mensaje y el color guardado', async () => {
+    const result = await locationService.updatePinColor(USER_ID, { pinColor: '#4ECDC4' });
+
+    expect(result).toEqual({ message: 'Color de pin actualizado', pinColor: '#4ECDC4' });
+  });
+
+  it('CA.1: acepta cada uno de los 5 colores de la paleta', async () => {
+    const validColors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7'];
+
+    for (const color of validColors) {
+      locationRepository.updatePinColor.mockClear();
+      await locationService.updatePinColor(USER_ID, { pinColor: color });
+      expect(locationRepository.updatePinColor).toHaveBeenCalledWith(USER_ID, color);
+    }
   });
 });
 

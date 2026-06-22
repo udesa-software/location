@@ -36,6 +36,11 @@ const locationSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    // H9: color del pin elegido por el usuario en sus preferencias
+    pinColor: {
+      type: String,
+      default: null,
+    },
   },
   {
     timestamps: { createdAt: true, updatedAt: false },

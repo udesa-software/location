@@ -70,6 +70,16 @@ const locationController = {
     }
   },
 
+  // H9: actualizar el color del pin del usuario
+  async updatePinColor(req, res, next) {
+    try {
+      const result = await locationService.updatePinColor(req.user.sub, req.body);
+      res.status(200).json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+
   // Obtener perfil detallado de amigo (biografía, presencia, historial de ubicaciones)
   async getFriendProfile(req, res, next) {
     try {
