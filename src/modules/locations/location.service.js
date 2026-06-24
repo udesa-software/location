@@ -3,6 +3,7 @@ const { friendsClient } = require('../../clients/friendsClient');
 const { usersClient } = require('../../clients/usersClient');
 const { AppError } = require('../../middlewares/errorHandler');
 const { env } = require('../../config/env');
+const { VALID_PIN_COLORS } = require('./pin-colors');
 
 // H7 CA.4: distancia en metros entre dos coordenadas (fórmula de Haversine)
 function haversineMeters(lat1, lon1, lat2, lon2) {
@@ -40,8 +41,6 @@ function isLabelStillValid(location, currentLat, currentLon) {
   return true;
 }
 
-// H9 CA.1: paleta predefinida de 5 colores válidos para el pin
-const VALID_PIN_COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7'];
 
 const locationService = {
   // H1: actualizar ubicación del usuario
@@ -207,6 +206,12 @@ const locationService = {
     );
 
     return { message: sanitized ? 'Etiqueta actualizada' : 'Etiqueta eliminada' };
+  },
+
+  // H9: devuelve el color de pin actual del usuario (null si nunca lo eligió)
+  async getPinColor(userId) {
+    const lastLocation = await locationRepository.findLastByUser(userId);
+    return { pinColor: lastLocation?.pinColor ?? null };
   },
 
   // H9 CA.2: guarda el color del pin elegido por el usuario.

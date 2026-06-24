@@ -59,9 +59,10 @@ const radarSchema = z.object({
 });
 
 // H9 CA.1: solo los 5 colores predefinidos de la paleta son válidos
+const { VALID_PIN_COLORS } = require('./pin-colors');
 const updatePinColorSchema = z.object({
   pinColor: z.string().refine(
-    (val) => ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7'].includes(val),
+    (val) => VALID_PIN_COLORS.includes(val),
     { message: 'Color de pin no válido. Usá uno de la paleta predefinida.' }
   ),
 });

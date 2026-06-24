@@ -70,6 +70,16 @@ const locationController = {
     }
   },
 
+  // H9: obtener el color de pin actual del usuario
+  async getPinColor(req, res, next) {
+    try {
+      const result = await locationService.getPinColor(req.user.sub);
+      res.status(200).json(result);
+    } catch (err) {
+      next(err);
+    }
+  },
+
   // H9: actualizar el color del pin del usuario
   async updatePinColor(req, res, next) {
     try {

@@ -28,6 +28,9 @@ router.put('/label', authenticate, validate(updateLabelSchema), locationControll
 // DELETE /api/locations/label — H7 CA.3: borrar etiqueta
 router.delete('/label', authenticate, locationController.deleteLabel);
 
+// GET /api/locations/pin-color — H9: obtener el color de pin actual del usuario
+router.get('/pin-color', authenticate, locationController.getPinColor);
+
 // PATCH /api/locations/pin-color — H9: guardar el color del pin del usuario
 router.patch('/pin-color', authenticate, validate(updatePinColorSchema), locationController.updatePinColor);
 
