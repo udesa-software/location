@@ -246,16 +246,16 @@ const locationService = {
       throw new AppError(400, 'No se encontró el perfil de este usuario');
     }
 
-    // 3. Determinar presencia en tiempo real
+    // 3. Verificar estado del modo privado (CA.3) — debe ir antes de calcular isOnline
+    const privacy = await locationRepository.findPrivacyByUser(friendId);
+    const isPrivate = privacy?.isPrivate ?? false;
+
+    // 4. Determinar presencia en tiempo real (solo si no está en modo privado)
     let isOnline = false;
-    if (profile.last_seen_at) {
+    if (profile.last_seen_at && !isPrivate && !profile.is_private) {
       const fiveMinutesMs = 5 * 60 * 1000;
       isOnline = (Date.now() - new Date(profile.last_seen_at).getTime()) <= fiveMinutesMs;
     }
-
-    // 4. Verificar estado del modo privado (CA.3)
-    const privacy = await locationRepository.findPrivacyByUser(friendId);
-    const isPrivate = privacy?.isPrivate ?? false;
 
     let locationHistory = [];
     if (!isPrivate) {
