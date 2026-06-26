@@ -4,6 +4,7 @@ const { usersClient } = require('../../clients/usersClient');
 const { AppError } = require('../../middlewares/errorHandler');
 const { env } = require('../../config/env');
 const { VALID_PIN_COLORS } = require('./pin-colors');
+const { logger } = require('../../observability/logger');
 
 // H7 CA.4: distancia en metros entre dos coordenadas (fórmula de Haversine)
 function haversineMeters(lat1, lon1, lat2, lon2) {
@@ -56,6 +57,7 @@ const locationService = {
     if (lastLocation) {
       const secondsSinceLastUpdate = (Date.now() - new Date(lastLocation.createdAt).getTime()) / 1000;
       if (secondsSinceLastUpdate < minIntervalSeconds) {
+        logger.warn({ event: 'location.update_rate_limited', userId, secondsSinceLastUpdate }, 'location.update_rate_limited');
         throw new AppError(
           429,
           `Demasiadas actualizaciones. Esperá al menos ${Math.ceil(minIntervalSeconds / 60)} minutos entre envíos.`
@@ -128,6 +130,7 @@ const locationService = {
   async setPrivacyStatus(userId, isPrivate) {
     await locationRepository.upsertPrivacy(userId, isPrivate);
     await usersClient.updateUserPrivacy(userId, isPrivate);
+    logger.info({ event: 'location.privacy_changed', userId, isPrivate }, 'location.privacy_changed');
     return {
       message: isPrivate ? 'Modo privado activado' : 'Modo privado desactivado',
       isPrivate,
