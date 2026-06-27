@@ -619,6 +619,47 @@ describe('locationService.updateLabel', () => {
 });
 
 // ---------------------------------------------------------------------------
+// H9: getPinColor
+// ---------------------------------------------------------------------------
+describe('locationService.getPinColor', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('retorna el pinColor del último documento del usuario', async () => {
+    locationRepository.findLastByUser.mockResolvedValue({ pinColor: '#4ECDC4' });
+
+    const result = await locationService.getPinColor(USER_ID);
+
+    expect(result).toEqual({ pinColor: '#4ECDC4' });
+  });
+
+  it('retorna null si el usuario no tiene ubicación registrada', async () => {
+    locationRepository.findLastByUser.mockResolvedValue(null);
+
+    const result = await locationService.getPinColor(USER_ID);
+
+    expect(result).toEqual({ pinColor: null });
+  });
+
+  it('retorna null si el último documento no tiene pinColor asignado', async () => {
+    locationRepository.findLastByUser.mockResolvedValue({ pinColor: null });
+
+    const result = await locationService.getPinColor(USER_ID);
+
+    expect(result).toEqual({ pinColor: null });
+  });
+
+  it('llama a findLastByUser con el userId correcto', async () => {
+    locationRepository.findLastByUser.mockResolvedValue(null);
+
+    await locationService.getPinColor(USER_ID);
+
+    expect(locationRepository.findLastByUser).toHaveBeenCalledWith(USER_ID);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // H9: updatePinColor
 // ---------------------------------------------------------------------------
 describe('locationService.updatePinColor', () => {
