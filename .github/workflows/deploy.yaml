@@ -48,6 +48,9 @@ jobs:
         env:
           LOCATION_MONGODB_URI: ${{ secrets.LOCATION_MONGODB_URI }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          LOKI_URL: ${{ secrets.LOKI_URL }}
+          LOKI_USER: ${{ secrets.LOKI_USER }}
+          LOKI_TOKEN: ${{ secrets.LOKI_TOKEN }}
         run: |
           envsubst < k8s/secret.template.yaml > k8s/secret.yaml
 
