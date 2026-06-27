@@ -98,20 +98,22 @@ const locationService = {
       usersClient.getUserProfiles(friendIds)
     ]);
 
-    // Mapa de usernames asegurando que el ID sea string
-    const profileMap = new Map(profiles.map(p => [String(p.id), p.username]));
+    const profileMap = new Map(profiles.map(p => [String(p.id), p]));
 
     const sixHoursMs = 6 * 60 * 60 * 1000;
 
     const friends = locations.map((loc) => {
       const friendId = String(loc._id);
-      const username = profileMap.get(friendId) || 'Usuario';
+      const profile = profileMap.get(friendId);
+      const username = profile?.username || 'Usuario';
+      const profile_photo_url = profile?.profile_photo_url ?? null;
       const distanceMeters = haversineMeters(latitude, longitude, loc.latitude, loc.longitude);
       const labelValid = loc.label && loc.labelCreatedAt &&
         (Date.now() - new Date(loc.labelCreatedAt).getTime() <= sixHoursMs);
       return {
         userId: friendId,
         username,
+        profile_photo_url,
         latitude: Number(loc.latitude),
         longitude: Number(loc.longitude),
         distanceMeters: Math.round(distanceMeters),
@@ -169,15 +171,17 @@ const locationService = {
     const profiles = await usersClient.getUserProfiles(userIds);
 
     // Indexar perfiles por id para join eficiente
-    const profileMap = new Map(profiles.map((p) => [p.id, p.username]));
+    const profileMap = new Map(profiles.map((p) => [p.id, p]));
 
     const users = withinRadius
       .filter((loc) => profileMap.has(loc._id))
       .map((loc) => {
+        const profile = profileMap.get(loc._id);
         const distanceMeters = Math.round(haversineMeters(latitude, longitude, loc.latitude, loc.longitude));
         return {
           userId: loc._id,
-          username: profileMap.get(loc._id),
+          username: profile.username,
+          profile_photo_url: profile.profile_photo_url ?? null,
           distanceMeters,
           distance: formatDistance(distanceMeters),
         };
