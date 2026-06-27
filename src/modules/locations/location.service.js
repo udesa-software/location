@@ -3,6 +3,7 @@ const { friendsClient } = require('../../clients/friendsClient');
 const { usersClient } = require('../../clients/usersClient');
 const { AppError } = require('../../middlewares/errorHandler');
 const { env } = require('../../config/env');
+const { VALID_PIN_COLORS } = require('./pin-colors');
 const { logger } = require('../../observability/logger');
 
 // H7 CA.4: distancia en metros entre dos coordenadas (fórmula de Haversine)
@@ -41,6 +42,7 @@ function isLabelStillValid(location, currentLat, currentLon) {
   return true;
 }
 
+
 const locationService = {
   // H1: actualizar ubicación del usuario
   async updateLocation(userId, { latitude, longitude, locationUpdateFrequency }) {
@@ -75,8 +77,10 @@ const locationService = {
       };
     }
 
-    await locationRepository.save(userId, latitude, longitude, labelData);
-    logger.info({ event: 'location.updated', userId }, 'location.updated');
+    // H9 CA.2: propagar el color del pin del documento anterior al nuevo
+    const pinColor = lastLocation?.pinColor ?? null;
+
+    await locationRepository.save(userId, latitude, longitude, labelData, pinColor);
     return { message: 'Ubicación actualizada' };
   },
 
@@ -115,6 +119,7 @@ const locationService = {
         distanceMeters: Math.round(distanceMeters),
         distance: formatDistance(distanceMeters),
         label: labelValid ? loc.label : null,
+        pinColor: loc.pinColor ?? null,
         updatedAt: loc.updatedAt,
       };
     });
@@ -210,6 +215,26 @@ const locationService = {
     return { message: sanitized ? 'Etiqueta actualizada' : 'Etiqueta eliminada' };
   },
 
+  // H9: devuelve el color de pin actual del usuario (null si nunca lo eligió)
+  async getPinColor(userId) {
+    const lastLocation = await locationRepository.findLastByUser(userId);
+    return { pinColor: lastLocation?.pinColor ?? null };
+  },
+
+  // H9 CA.2: guarda el color del pin elegido por el usuario.
+  // Solo acepta colores de la paleta predefinida (CA.1).
+  async updatePinColor(userId, { pinColor }) {
+    if (!VALID_PIN_COLORS.includes(pinColor)) {
+      throw new AppError(400, 'Color de pin no válido. Elegí uno de la paleta disponible.');
+    }
+    const lastLocation = await locationRepository.findLastByUser(userId);
+    if (!lastLocation) {
+      throw new AppError(400, 'Debés enviar tu ubicación antes de elegir un color de pin');
+    }
+    await locationRepository.updatePinColor(userId, pinColor);
+    return { message: 'Color de pin actualizado', pinColor };
+  },
+
   // Obtiene el perfil consolidado de un amigo (biografía, presencia online, y sus últimas 10 ubicaciones si no está en modo privado)
   async getFriendProfile(userId, friendId) {
     if (userId === friendId) {
@@ -228,11 +253,11 @@ const locationService = {
       throw new AppError(400, 'No se encontró el perfil de este usuario');
     }
 
-    // 4. Verificar estado del modo privado (CA.3)
+    // 3. Verificar estado del modo privado (CA.3) — debe ir antes de calcular isOnline
     const privacy = await locationRepository.findPrivacyByUser(friendId);
     const isPrivate = privacy?.isPrivate ?? false;
 
-    // 3. Determinar presencia en tiempo real
+    // 4. Determinar presencia en tiempo real (solo si no está en modo privado)
     let isOnline = false;
     if (profile.last_seen_at && !isPrivate && !profile.is_private) {
       const fiveMinutesMs = 5 * 60 * 1000;
